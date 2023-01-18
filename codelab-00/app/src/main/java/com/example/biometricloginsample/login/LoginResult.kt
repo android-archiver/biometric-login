@@ -13,10 +13,6 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+package com.example.biometricloginsample.login
 
-package com.example.biometricloginsample
-
-object SampleAppUser {
-    var fakeToken: String? = null
-    var username: String? = null
-}
+data class LoginResult(val success: Boolean = false)

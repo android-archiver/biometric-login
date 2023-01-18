@@ -13,6 +13,18 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package com.example.biometricloginsample
+package com.example.biometricloginsample.login
 
-data class LoginResult(val success: Boolean = false)
+/**
+ * Data validation state of the login form.
+ */
+sealed class LoginFormState
+
+data class FailedLoginFormState(
+    val usernameError: Int? = null,
+    val passwordError: Int? = null
+) : LoginFormState()
+
+data class SuccessfulLoginFormState(
+    val isDataValid: Boolean = false
+) : LoginFormState()

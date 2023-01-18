@@ -14,16 +14,26 @@
  * limitations under the License.
  */
 
-package com.example.biometricloginsample
+package com.example.biometricloginsample.login
 
+import android.content.Context
+import android.content.Intent
 import android.os.Bundle
 import android.util.Log
+import android.view.View
 import android.view.inputmethod.EditorInfo
+import android.widget.Toast
 import androidx.activity.viewModels
 import androidx.appcompat.app.AppCompatActivity
+import androidx.biometric.BiometricManager
+import androidx.biometric.BiometricPrompt
 import androidx.core.widget.doAfterTextChanged
 import androidx.lifecycle.Observer
+import com.example.biometricloginsample.*
 import com.example.biometricloginsample.databinding.ActivityLoginBinding
+import com.example.biometricloginsample.enable_login.EnableBiometricLoginActivity
+import com.example.biometricloginsample.data.SampleAppUser
+import com.example.biometricloginsample.util.*
 
 /**
  * After entering "valid" username and password, login button becomes enabled
@@ -34,11 +44,55 @@ class LoginActivity : AppCompatActivity() {
     private lateinit var binding: ActivityLoginBinding
     private val loginWithPasswordViewModel by viewModels<LoginViewModel>()
 
+    private lateinit var biometricPrompt: BiometricPrompt
+    private val cryptographyManager = InjectorCryptographyManager.getCryptographyManager()
+
+    // retrieve encrypted
+    private val ciphertextWrapper get() = cryptographyManager.getCiphertextWrapperFromSharedPrefs(
+        applicationContext,
+        SHARED_PREFS_FILENAME,
+        Context.MODE_PRIVATE,
+        CIPHERTEXT_WRAPPER
+    )
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         binding = ActivityLoginBinding.inflate(layoutInflater)
         setContentView(binding.root)
-        setupForLoginWithPassword()
+
+        val canAuthenticate = BiometricManager.from(applicationContext).canAuthenticate()
+
+        if (canAuthenticate == BiometricManager.BIOMETRIC_SUCCESS) {
+            binding.useBiometrics.visibility = View.VISIBLE
+
+            binding.useBiometrics.setOnClickListener {
+                if (ciphertextWrapper != null) {
+                    showBiometricPromptForDecryption()
+                } else {
+                    startActivity(Intent(this, EnableBiometricLoginActivity::class.java))
+                }
+            }
+        } else {
+            binding.useBiometrics.visibility = View.INVISIBLE
+        }
+
+        if (ciphertextWrapper == null) {
+            setupForLoginWithPassword()
+        }
+    }
+
+    override fun onResume() {
+        super.onResume()
+
+        if (ciphertextWrapper != null) {
+            if (SampleAppUser.fakeToken == null) {
+                showBiometricPromptForDecryption()
+            } else {
+                // The user has already logged in, so proceed to the rest of the app
+                // this is a todo for you, the developer
+                updateApp(getString(R.string.already_signedin))
+            }
+        }
     }
 
     private fun setupForLoginWithPassword() {
@@ -94,5 +148,45 @@ class LoginActivity : AppCompatActivity() {
 
     private fun updateApp(successMsg: String) {
         binding.success.text = successMsg
+    }
+
+    // BIOMETRICS SECTION
+
+    private fun showBiometricPromptForDecryption() {
+
+        ciphertextWrapper?.let { textWrapper ->
+
+            val secretKeyName = "biometric_sample_encryption_key"
+
+            val cipher = cryptographyManager.getInitializedCipherForDecryption(secretKeyName, textWrapper.initializationVector)
+
+            biometricPrompt = BiometricPromptUtils.createBiometricPrompt(this, ::decryptServerTokenFromStorage)
+
+            val promptInfo = BiometricPromptUtils.createPromptInfo(this)
+
+            biometricPrompt.authenticate(promptInfo, BiometricPrompt.CryptoObject(cipher))
+        }
+    }
+
+    private fun decryptServerTokenFromStorage(authResult: BiometricPrompt.AuthenticationResult) {
+
+        ciphertextWrapper?.let { textWrapper ->
+
+            authResult.cryptoObject?.cipher?.let {
+
+                // decrypt
+                val plaintext = cryptographyManager.decryptData(textWrapper.ciphertext, it)
+
+                Toast.makeText(this, "Decrypted data: " + plaintext, Toast.LENGTH_SHORT).show()
+
+                SampleAppUser.fakeToken = plaintext
+                // Now that you have the token, you can query server for everything else
+                // the only reason we call this fakeToken is because we didn't really get it from
+                // the server. In your case, you will have gotten it from the server the first time
+                // and therefore, it's a real token.
+
+                updateApp(getString(R.string.already_signedin))
+            }
+        }
     }
 }

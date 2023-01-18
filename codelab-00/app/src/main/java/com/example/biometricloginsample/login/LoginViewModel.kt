@@ -13,12 +13,14 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package com.example.biometricloginsample
+package com.example.biometricloginsample.login
 
 import android.util.Patterns
 import androidx.lifecycle.LiveData
 import androidx.lifecycle.MutableLiveData
 import androidx.lifecycle.ViewModel
+import com.example.biometricloginsample.R
+import com.example.biometricloginsample.data.SampleAppUser
 
 class LoginViewModel : ViewModel() {
 
@@ -62,7 +64,8 @@ class LoginViewModel : ViewModel() {
             // right here:
 
             SampleAppUser.username = username
-            SampleAppUser.fakeToken = java.util.UUID.randomUUID().toString()
+            SampleAppUser.fakeToken = "hesoyam" //java.util.UUID.randomUUID().toString()
+
             _loginResult.value = LoginResult(true)
         } else {
             _loginResult.value = LoginResult(false)
